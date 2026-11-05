@@ -1,0 +1,80 @@
+{
+  "format": 1,
+  "title": {
+    "en": "llsix DSH plugins",
+    "zh": "llsix 的 DSH 插件"
+  },
+  "description": {
+    "en": "Plugins for DeepSeek Harness, published by llsix.",
+    "zh": "llsix 发布给 DeepSeek Harness 的插件。"
+  },
+  "metadata": {
+    "categories": {
+      "sidebar": {
+        "title": {
+          "en": "Sidebar",
+          "zh": "侧栏"
+        }
+      }
+    },
+    "labels": {
+      "sessions": {
+        "title": {
+          "en": "Sessions",
+          "zh": "会话"
+        }
+      },
+      "cleanup": {
+        "title": {
+          "en": "Cleanup",
+          "zh": "清理"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-session-hygiene",
+      "title": {
+        "en": "Session cleanup",
+        "zh": "会话清理"
+      },
+      "description": {
+        "en": "Delete sessions into a recoverable trash, clean up sessions orphaned by deleted workspaces, and group workspaces into categories.",
+        "zh": "把会话删除到可恢复的回收站，清理被删除工作区遗留的孤儿会话，并给工作区分组。"
+      },
+      "icon": "icon.svg",
+      "author": "llsix",
+      "homepage": "https://github.com/liudapeng0311/dsh-session-hygiene#readme",
+      "repository": {
+        "url": "https://github.com/liudapeng0311/dsh-session-hygiene"
+      },
+      "metadata": {
+        "category": "sidebar",
+        "keywords": [
+          "dsh",
+          "dsh-plugin",
+          "deepseek-harness",
+          "session",
+          "trash",
+          "orphans",
+          "workspaces",
+          "categories"
+        ],
+        "labels": ["sessions", "cleanup"]
+      },
+      "versions": [
+        {
+          "version": "0.1.2",
+          "publishTimestamp": 1793879455,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.1"
+          }
+        }
+      ]
+    }
+  ]
+}
