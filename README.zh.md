@@ -1,6 +1,6 @@
 # dsh-session-hygiene
 
-[English](README.md) | 中文
+[English](https://github.com/liudapeng0311/dsh-session-hygiene/blob/main/README.md) | 中文
 
 一个插件，补上 DSH 侧边栏的三个缺口：
 

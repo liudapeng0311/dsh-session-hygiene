@@ -1,6 +1,6 @@
 # dsh-session-hygiene
 
-English | [中文](README.zh.md)
+English | [中文](https://github.com/liudapeng0311/dsh-session-hygiene/blob/main/README.zh.md)
 
 Three gaps in the shipped DSH sidebar, closed by one plugin:
 
