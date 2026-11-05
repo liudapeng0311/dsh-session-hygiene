@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-hygiene",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Delete sessions into a recoverable trash, clean up sessions orphaned by deleted workspaces, and group workspaces into categories.",
   "type": "module",
   "license": "MIT",
@@ -37,7 +37,9 @@
   ],
   "dsh": {
     "manifestVersion": 1,
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
@@ -46,5 +48,14 @@
         "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/liudapeng0311/dsh-session-hygiene.git"
+  },
+  "homepage": "https://github.com/liudapeng0311/dsh-session-hygiene#readme",
+  "bugs": {
+    "url": "https://github.com/liudapeng0311/dsh-session-hygiene/issues"
+  },
+  "author": "llsix"
 }
