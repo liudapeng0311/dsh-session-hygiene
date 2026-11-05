@@ -1,0 +1,9 @@
+# dsh-session-hygiene bundle patch.
+#
+# One dual-face plugin row: the node half (exports ".") owns the trash directory
+# and the session-store moves, the browser half (exports "./client") adds a
+# session-menu row and a Settings page. `dsh.client` in package.json wires the
+# browser half to the Host half.
+- insert:
+    - id: session-hygiene
+      name: 'dsh-session-hygiene'

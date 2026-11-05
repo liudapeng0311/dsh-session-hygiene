@@ -1,0 +1,8 @@
+node_modules/
+*.tgz
+*.log
+.DS_Store
+Thumbs.db
+
+# DSH runtime artifacts that can appear beside a linked checkout
+.plugin-manager/
