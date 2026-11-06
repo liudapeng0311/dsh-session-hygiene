@@ -1694,6 +1694,10 @@ window.__ModuleLoader__.load({
           restore();
 
           if (!state.showHeaders || state.categories.length === 0) {
+            // Header bands are nodes this component mounts; turning the toggle
+            // off has to take them down. Leaving them would also strand them:
+            // with no repaint the click still posts a toggle but nothing moves.
+            clear();
             signature = computeSignature(workspaceRows);
             return;
           }
