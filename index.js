@@ -408,6 +408,23 @@ async function hideSession(ctx, sessionId) {
   }
 }
 
+/**
+ * Trashing archives the session to hide its row, so a restore has to undo that
+ * archive as well. Without it the log returns to its origin, the workspace
+ * lists the id again, and the sidebar still hides the row.
+ */
+async function unhideSession(ctx, sessionId) {
+  const registry = service(ctx, 'workspaceRegistry');
+  if (!registry || typeof registry.unarchiveSession !== 'function') return false;
+  try {
+    await registry.unarchiveSession(sessionId);
+    return true;
+  } catch (error) {
+    warn('unarchiveSession failed', sessionId, textOf(error));
+    return false;
+  }
+}
+
 /** Page-wide row removal without a reload (forwarded host event). */
 function announceRemoval(ctx, sessionId) {
   try {
@@ -620,8 +637,9 @@ async function doRestore(ctx, entryId) {
   } catch (error) {
     throw new RequestError(500, '恢复失败：' + textOf(error));
   }
-  // Trashing detached the id from its workspace; without this the restored
-  // session lands in the sidebar's ungrouped bucket.
+  // Trashing archived the row and detached the id from its workspace; a restore
+  // must undo both, or the session comes back invisible or ungrouped.
+  const unarchived = await unhideSession(ctx, entry.sessionId);
   const attached = await attachByCwd(ctx, entry.sessionId, entry.cwd);
   try {
     if (typeof ctx.emit === 'function') {
@@ -630,7 +648,7 @@ async function doRestore(ctx, entryId) {
   } catch (error) {
     warn('announceAdd failed', textOf(error));
   }
-  return { ok: true, sessionId: entry.sessionId, restoredTo: entry.from, attached };
+  return { ok: true, sessionId: entry.sessionId, restoredTo: entry.from, attached, unarchived };
 }
 
 async function doPurge(ctx, entryId) {

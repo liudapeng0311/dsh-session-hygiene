@@ -205,6 +205,11 @@ check(
   calls.some(([name, value]) => name === 'attachSession' && value === SESSION_ID),
   JSON.stringify(calls.filter(([name]) => name === 'attachSession')),
 );
+check(
+  'restore unarchives the session trashing hid',
+  calls.some(([name, value]) => name === 'unarchiveSession' && value === SESSION_ID),
+  JSON.stringify(calls.filter(([name]) => name === 'unarchiveSession')),
+);
 
 const addedPayloads = events.filter(([name]) => name === 'api-session/added').map(([, value]) => value);
 const lastAdded = addedPayloads[addedPayloads.length - 1];
