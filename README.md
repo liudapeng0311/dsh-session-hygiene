@@ -107,10 +107,12 @@ Open **Settings → Workspace categories**.
   **Show category headers in the sidebar** hides the bands without losing the
   assignments.
 
-A category only gets a header while its rows form one contiguous block. A split
-category shows no header rather than a header over rows that belong elsewhere.
-The bands are nodes this plugin adds and removes itself, so removing the plugin
-restores the sidebar exactly as the shell rendered it.
+Rows under a band are indented one step, so the band reads as their heading
+instead of a sibling. A category only gets a header while its rows form one
+contiguous block; a split category shows no header rather than a header over rows
+that belong elsewhere. Both the bands and the indent belong to this plugin and are
+undone when it goes away, so the sidebar returns to exactly what the shell
+rendered.
 
 ## Where your data goes
 

@@ -1556,10 +1556,34 @@ window.__ModuleLoader__.load({
 
         // Rows we hid for a collapsed category, with the display value to put back.
         const hidden = new Map();
+
+        // Rows under a category band sit one step right of it, so the band reads
+        // as their heading instead of a sibling. Only rows of a category that
+        // actually drew a band shift: a split category has none to sit under.
+        const INDENT_PX = 12;
+        const indented = new Map();
+
+        const indent = (element) => {
+          const known = indented.get(element);
+          if (known) {
+            // A re-render can drop the inline value we set; put it back.
+            if (!element.style.paddingLeft) {
+              element.style.paddingLeft = known.base + INDENT_PX + 'px';
+            }
+            return;
+          }
+          const base = Number.parseFloat(window.getComputedStyle(element).paddingLeft) || 0;
+          indented.set(element, { base, inline: element.style.paddingLeft });
+          element.style.paddingLeft = base + INDENT_PX + 'px';
+        };
+
         const restore = () => {
           for (const [element, value] of hidden) element.style.display = value;
           hidden.clear();
+          for (const [element, known] of indented) element.style.paddingLeft = known.inline;
+          indented.clear();
         };
+
         const conceal = (element) => {
           if (hidden.has(element)) return;
           hidden.set(element, element.style.display);
@@ -1762,6 +1786,20 @@ window.__ModuleLoader__.load({
             if (header.nextElementSibling !== anchor) {
               anchor.parentElement?.insertBefore(header, anchor);
             }
+          }
+
+          // Shift every row that belongs to a banded category — the sessions
+          // under each workspace included — so the band reads as their heading.
+          // Rows of a category without a band stay flush, or the extra gap would
+          // label nothing.
+          const banded = new Set(desired.keys());
+          let governed = '';
+          for (const row of document.querySelectorAll('[data-row-key]')) {
+            const key = row.getAttribute('data-row-key') || '';
+            if (key.startsWith('workspace:')) {
+              governed = state.assignments[key.slice('workspace:'.length)] || '';
+            }
+            if (governed !== '' && banded.has(governed)) indent(row);
           }
 
           signature = computeSignature(workspaceRows);
