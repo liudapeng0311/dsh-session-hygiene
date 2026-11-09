@@ -1682,7 +1682,7 @@ window.__ModuleLoader__.load({
           holder.setAttribute('data-category', categoryId);
           holder.style.cssText =
             'display:flex;align-items:center;gap:5px;width:100%;' +
-            'padding:10px 8px 3px 10px;border:0;background:transparent;cursor:pointer;' +
+            'padding:10px 18px 3px 10px;border:0;background:transparent;cursor:pointer;' +
             'text-align:left;font-size:12px;line-height:18px;font-weight:600;' +
             'letter-spacing:.01em;color:var(--dsw-alias-label-tertiary);user-select:none;';
           const chevron = document.createElement('span');
@@ -1696,8 +1696,18 @@ window.__ModuleLoader__.load({
           addButton.setAttribute('aria-label', t('addWorkspaceHere'));
           addButton.style.cssText =
             'flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;' +
-            'width:18px;height:18px;padding:0;border:0;border-radius:4px;background:transparent;' +
-            'color:inherit;cursor:pointer;opacity:.85;';
+            'width:20px;height:20px;padding:0;border:0;border-radius:4px;background:transparent;' +
+            'color:inherit;cursor:pointer;opacity:.7;transition:background .12s ease,opacity .12s ease;';
+          // Inline styles cannot express :hover, so the affordance is toggled by
+          // hand with the theme's own interactive background token.
+          addButton.addEventListener('mouseenter', () => {
+            addButton.style.background = 'var(--dsw-alias-interactive-bg-hover)';
+            addButton.style.opacity = '1';
+          });
+          addButton.addEventListener('mouseleave', () => {
+            addButton.style.background = 'transparent';
+            addButton.style.opacity = '.7';
+          });
           addButton.innerHTML =
             '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">' +
             '<path d="M6 2.5v7M2.5 6h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
