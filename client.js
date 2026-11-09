@@ -64,6 +64,7 @@ window.__ModuleLoader__.load({
       clusteredDone: '已按 {count} 个工作区重新排序。',
       noCategories: '还没有分类。先新增一个，再给工作区选分类。',
       showHeaders: '在侧边栏显示分类标题',
+      addWorkspaceHere: '在这个分类下新建工作区',
       clearAssignments: '清空归属',
       confirmClear: '确认清空全部归属',
       clearedDone: '已清空全部归属，现在可以重新分配。',
@@ -137,6 +138,7 @@ window.__ModuleLoader__.load({
       clusteredDone: 'Reordered {count} workspace(s).',
       noCategories: 'No categories yet. Add one, then assign workspaces to it.',
       showHeaders: 'Show category headers in the sidebar',
+      addWorkspaceHere: 'Create a workspace in this category',
       clearAssignments: 'Clear assignments',
       confirmClear: 'Clear all assignments',
       clearedDone: 'Assignments cleared — you can reassign now.',
@@ -1537,6 +1539,7 @@ window.__ModuleLoader__.load({
     /* -------------------------------------------------------------- */
 
     const LABEL_ATTR = 'data-session-hygiene-label';
+    const LABEL_TEXT_ATTR = 'data-session-hygiene-label-text';
 
     /**
      * `sidebar.workspaces` is a single slot owned by the shell, so a category
@@ -1617,6 +1620,27 @@ window.__ModuleLoader__.load({
           }).catch(() => {});
         };
 
+        // The host owns the native directory dialog, so one request covers pick,
+        // create and filing. Guarded because the dialog stays open for a while.
+        let creating = false;
+        const createWorkspaceInCategory = (categoryId) => {
+          if (creating) return;
+          creating = true;
+          post({ action: 'create-workspace', categoryId })
+            .then((result) => {
+              if (!result || result.cancelled) return;
+              // The registry adds the row; this event re-reads the assignment so
+              // the new row lands indented under its band.
+              window.dispatchEvent(new Event('dsh-session-hygiene:categories'));
+            })
+            .catch((error) => {
+              console.error('[session-hygiene] create workspace failed', error);
+            })
+            .finally(() => {
+              creating = false;
+            });
+        };
+
         /**
          * A header is a real drop target, so joining a category is an explicit
          * drop ON that category rather than a guess about where a row landed.
@@ -1649,8 +1673,11 @@ window.__ModuleLoader__.load({
 
         /** Builds one header node; listeners are bound once, not on every paint. */
         const createHeader = (categoryId) => {
-          const holder = document.createElement('button');
-          holder.type = 'button';
+          // A div carrying the button role: the "+" control is a real button and
+          // one button may not nest inside another.
+          const holder = document.createElement('div');
+          holder.setAttribute('role', 'button');
+          holder.setAttribute('tabindex', '0');
           holder.setAttribute(LABEL_ATTR, '1');
           holder.setAttribute('data-category', categoryId);
           holder.style.cssText =
@@ -1661,11 +1688,36 @@ window.__ModuleLoader__.load({
           const chevron = document.createElement('span');
           chevron.style.cssText = 'flex:none;display:inline-flex;align-items:center;';
           const text = document.createElement('span');
+          text.setAttribute(LABEL_TEXT_ATTR, '1');
+          text.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+          const addButton = document.createElement('button');
+          addButton.type = 'button';
+          addButton.title = t('addWorkspaceHere');
+          addButton.setAttribute('aria-label', t('addWorkspaceHere'));
+          addButton.style.cssText =
+            'flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;' +
+            'width:18px;height:18px;padding:0;border:0;border-radius:4px;background:transparent;' +
+            'color:inherit;cursor:pointer;opacity:.85;';
+          addButton.innerHTML =
+            '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">' +
+            '<path d="M6 2.5v7M2.5 6h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
+            '</svg>';
+          addButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            createWorkspaceInCategory(categoryId);
+          });
           holder.appendChild(chevron);
           holder.appendChild(text);
+          holder.appendChild(addButton);
           holder.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
+            toggle(holder.getAttribute('data-category') || '');
+          });
+          holder.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
             toggle(holder.getAttribute('data-category') || '');
           });
           attachDropTarget(holder, categoryId);
@@ -1683,7 +1735,7 @@ window.__ModuleLoader__.load({
               chevron.innerHTML = chevronMarkup(direction);
             }
           }
-          const text = holder.lastElementChild;
+          const text = holder.querySelector('[' + LABEL_TEXT_ATTR + ']');
           if (text && text.textContent !== label) text.textContent = label;
         };
 

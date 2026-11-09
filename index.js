@@ -827,6 +827,74 @@ async function doSaveCategories(ctx, body) {
   };
 }
 
+/**
+ * Create a workspace from a directory the user picks and file it under one
+ * category. Picking is the host's job: the desktop build offers a native
+ * dialog, which a browser-side button cannot open.
+ */
+async function doCreateWorkspace(ctx, body) {
+  const categoryId = cleanCategoryId(body?.categoryId);
+  const picker = service(ctx, 'directoryPicker');
+  const capability = picker && typeof picker.capability === 'function' ? picker.capability() : undefined;
+  if (!capability) throw new RequestError(501, '当前 profile 没有目录选择器，无法新建工作区。');
+  if (capability.kind !== 'native') {
+    throw new RequestError(501, '这个目录选择器只有浏览模式，暂时无法从这里新建工作区。');
+  }
+
+  const registry = service(ctx, 'workspaceRegistry');
+  if (!registry || typeof registry.create !== 'function') {
+    throw new RequestError(501, '当前 profile 没有 workspaceRegistry，无法新建工作区。');
+  }
+
+  let chosen;
+  try {
+    chosen = await capability.pick(new AbortController().signal);
+  } catch (error) {
+    throw new RequestError(500, '打开目录选择器失败：' + textOf(error));
+  }
+  if (chosen === null || chosen === undefined || chosen === '') {
+    return { ok: true, cancelled: true };
+  }
+  if (typeof chosen !== 'string') throw new RequestError(400, '目录选择器没有返回路径。');
+
+  let workspace;
+  try {
+    workspace = await registry.create(chosen, path.basename(chosen));
+  } catch (error) {
+    throw new RequestError(400, '无法把这个目录登记为工作区：' + textOf(error));
+  }
+
+  const state = await readCategories();
+  if (!state.categories.some((category) => category.id === categoryId)) {
+    // The category vanished while the dialog was open; the workspace still
+    // exists, it just lands unclassified.
+    return { ok: true, workspaceId: workspace.id, path: workspace.path, categorized: false };
+  }
+
+  const next = {
+    categories: state.categories,
+    assignments: { ...state.assignments, [workspace.id]: categoryId },
+    collapsed: state.collapsed ?? {},
+    showHeaders: state.showHeaders !== false,
+  };
+  await writeCategories(next);
+  let order = null;
+  try {
+    // create() prepends; clustering is what moves it under its category.
+    order = await applyClusters(ctx, next);
+  } catch (error) {
+    warn('cluster after create failed', textOf(error));
+  }
+  return {
+    ok: true,
+    workspaceId: workspace.id,
+    title: workspace.title,
+    path: workspace.path,
+    categorized: true,
+    order,
+  };
+}
+
 /** Expand/collapse one category. Rejects ids that are not in the saved set. */
 async function doToggleCategory(ctx, categoryId, collapsed) {
   const state = await readCategories();
@@ -1095,6 +1163,8 @@ async function handle(ctx, request) {
         const categoryId = typeof body.categoryId === 'string' ? body.categoryId : '';
         return json(200, await doToggleCategory(ctx, categoryId, body.collapsed === true));
       }
+      case 'create-workspace':
+        return json(200, await doCreateWorkspace(ctx, body));
       case 'cluster':
         return json(200, await doCluster(ctx));
       default:

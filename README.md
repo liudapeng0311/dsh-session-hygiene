@@ -103,6 +103,8 @@ Open **Settings → Workspace categories**.
   shipped drag-to-reorder keeps working — this only reorders on save.
 - **Clear assignments** sends every workspace back to unclassified without
   deleting the categories themselves.
+- **+ on a band** opens the host's directory dialog and registers the chosen
+  folder as a workspace, filed under that category and regrouped into place.
 - Click a header to collapse or expand a category; the collapsed state persists.
   **Show category headers in the sidebar** hides the bands without losing the
   assignments.
@@ -156,6 +158,9 @@ directory back by hand, following its `entry.json`.
 - Category headers require contiguity; dropping a row *between* two rows derives
   its category from the header above, which is a guess when a category holds a
   single row.
+- The band's **+** needs a host directory picker with the native dialog (the
+  `directoryPicker` service, capability `native`). A browse-only profile refuses
+  with a message instead of opening a browser picker.
 - Host-side JavaScript does not hot-reload: restart the host after install or
   update.
 

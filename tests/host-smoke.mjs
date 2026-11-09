@@ -455,6 +455,54 @@ check(
   JSON.stringify(badCategory.body.assignments),
 );
 
+/* ---- create a workspace from a category band ---- */
+const projectBeta = path.join(home, 'project-beta');
+await fsp.mkdir(projectBeta, { recursive: true });
+
+let picked = projectBeta;
+services.directoryPicker = {
+  capability: () => ({
+    kind: 'native',
+    async pick() {
+      return picked;
+    },
+  }),
+};
+services.workspaceRegistry.create = async (target, title) => {
+  order.unshift('ws-new');
+  calls.push(['createWorkspace', target, title]);
+  return { id: 'ws-new', path: target, title: title || 'ws-new', sessionIds: [] };
+};
+
+const createdWorkspace = await call({ action: 'create-workspace', categoryId: 'work' });
+check(
+  'create-workspace returns 200',
+  createdWorkspace.status === 200,
+  JSON.stringify(createdWorkspace.body).slice(0, 160),
+);
+check(
+  'create-workspace registers the picked directory',
+  calls.some(([name, target]) => name === 'createWorkspace' && target === projectBeta),
+  JSON.stringify(calls.filter(([name]) => name === 'createWorkspace')),
+);
+check(
+  'create-workspace files it under the category',
+  createdWorkspace.body.categorized === true && createdWorkspace.body.workspaceId === 'ws-new',
+  JSON.stringify(createdWorkspace.body),
+);
+
+const afterCreate = await call({ action: 'categories' });
+const createdRow = (afterCreate.body.workspaces || []).find((workspace) => workspace.id === 'ws-new');
+check('the new workspace carries the category', createdRow?.categoryId === 'work', JSON.stringify(createdRow));
+
+picked = null;
+const cancelledCreate = await call({ action: 'create-workspace', categoryId: 'work' });
+check(
+  'cancelling the picker creates nothing',
+  cancelledCreate.status === 200 && cancelledCreate.body.cancelled === true,
+  JSON.stringify(cancelledCreate.body),
+);
+
 /* ---- summary ---- */
 await fsp.rm(home, { recursive: true, force: true });
 const failed = results.filter((item) => !item.ok);
