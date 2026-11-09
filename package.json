@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-hygiene",
-  "version": "0.1.7",
+  "version": "0.1.5",
   "description": "Delete sessions into a recoverable trash, clean up sessions orphaned by deleted workspaces, and group workspaces into categories.",
   "type": "module",
   "license": "MIT",

@@ -1169,6 +1169,36 @@ window.__ModuleLoader__.load({
       CHEVRON_PATHS[direction] +
       '" stroke="currentColor"/></svg>';
 
+    /** Hand-drawn stand-in, kept in the shell's stroke weight and 16-box grid. */
+    const FOLDER_PLUS_MARKUP =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="14" height="14" ' +
+      'fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" ' +
+      'stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M1.9 4.3c0-.5.4-1 1-1h3l1.2 1.5h5.9c.5 0 1 .5 1 1v6.1c0 .5-.5 1-1 1H2.9' +
+      'c-.6 0-1-.5-1-1z"/>' +
+      '<path d="M11.6 8.9v3.4M9.9 10.6h3.4"/>' +
+      '</svg>';
+
+    // Cloned from the shell's own "new workspace" control so the band's button
+    // matches the one above the workspace list; redrawing it would drift.
+    let shellWorkspaceGlyph = null;
+
+    const workspaceGlyphMarkup = () => {
+      if (shellWorkspaceGlyph) return shellWorkspaceGlyph;
+      for (const button of document.querySelectorAll(
+        'button[aria-label], [role="button"][aria-label]',
+      )) {
+        const label = (button.getAttribute('aria-label') || '').toLowerCase();
+        if (!/(workspace|工作区)/.test(label)) continue;
+        if (!/(new|add|create|新建|添加|创建)/.test(label)) continue;
+        const svg = button.querySelector('svg');
+        if (!svg) continue;
+        shellWorkspaceGlyph = svg.outerHTML;
+        return shellWorkspaceGlyph;
+      }
+      return FOLDER_PLUS_MARKUP;
+    };
+
     function CategoriesPanel() {
       const [state, setState] = React.useState(null);
       const [error, setError] = React.useState('');
@@ -1553,6 +1583,11 @@ window.__ModuleLoader__.load({
     function SidebarGroupLabels() {
       React.useEffect(() => {
         let state = { categories: [], assignments: {}, collapsed: {}, showHeaders: true };
+        // Last laid-out row geometry and time-label column. Rows report a zero
+        // box while hidden — every row hides once all categories collapse — so
+        // the last good measurement is reused instead of shrinking to nothing.
+        let lastRowBox = null;
+        let lastColumnRight = null;
         let signature = '';
         let timer = 0;
         let disposed = false;
@@ -1602,6 +1637,8 @@ window.__ModuleLoader__.load({
           for (const node of mounted.values()) node.remove();
           mounted.clear();
           for (const node of document.querySelectorAll('[' + LABEL_ATTR + ']')) node.remove();
+          // A bubble that is open when its band goes away would otherwise stay.
+          for (const node of document.querySelectorAll('[data-session-hygiene-bubble]')) node.remove();
         };
 
         /** Persist a drop: the workspace joins the category, then the list regroups. */
@@ -1671,6 +1708,26 @@ window.__ModuleLoader__.load({
           });
         };
 
+        /**
+         * Where a band must live: the anchor's own wrapper chain is not a list.
+         * A workspace row sits inside a single-child wrapper (and that inside a
+         * group section), so inserting beside the row puts the band INSIDE the
+         * workspace's hover subtree — entering the band opens that workspace's
+         * hover card. Climb past every wrapper that holds only one child, and
+         * insert into the first container that actually holds siblings.
+         */
+        const bandPlacement = (anchor) => {
+          let node = anchor;
+          let parent = node.parentElement;
+          while (parent && parent !== document.body) {
+            const owned = [...parent.children].filter((child) => !child.hasAttribute(LABEL_ATTR));
+            if (owned.length > 1) break;
+            node = parent;
+            parent = parent.parentElement;
+          }
+          return { list: parent ?? anchor.parentElement, before: node };
+        };
+
         /** Builds one header node; listeners are bound once, not on every paint. */
         const createHeader = (categoryId) => {
           // A div carrying the button role: the "+" control is a real button and
@@ -1681,7 +1738,7 @@ window.__ModuleLoader__.load({
           holder.setAttribute(LABEL_ATTR, '1');
           holder.setAttribute('data-category', categoryId);
           holder.style.cssText =
-            'display:flex;align-items:center;gap:5px;width:100%;' +
+            'display:flex;align-items:center;gap:5px;box-sizing:border-box;' +
             'padding:10px 18px 3px 10px;border:0;background:transparent;cursor:pointer;' +
             'text-align:left;font-size:12px;line-height:18px;font-weight:600;' +
             'letter-spacing:.01em;color:var(--dsw-alias-label-tertiary);user-select:none;';
@@ -1692,29 +1749,67 @@ window.__ModuleLoader__.load({
           text.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
           const addButton = document.createElement('button');
           addButton.type = 'button';
-          addButton.title = t('addWorkspaceHere');
           addButton.setAttribute('aria-label', t('addWorkspaceHere'));
           addButton.style.cssText =
             'flex:none;margin-left:auto;display:inline-flex;align-items:center;justify-content:center;' +
             'width:20px;height:20px;padding:0;border:0;border-radius:4px;background:transparent;' +
             'color:inherit;cursor:pointer;opacity:.7;transition:background .12s ease,opacity .12s ease;';
+          // The shell draws its own tooltips as a dark bubble; a native `title`
+          // would show the browser's grey one beside it. This is that bubble,
+          // built here because a plain DOM node cannot reach the shell's tooltip
+          // component — same shape, same text, no shortcut hint.
+          const bubble = document.createElement('div');
+          bubble.textContent = t('addWorkspaceHere');
+          bubble.setAttribute('data-session-hygiene-bubble', '1');
+          bubble.style.cssText =
+            'position:fixed;z-index:2147483000;pointer-events:none;visibility:hidden;opacity:0;' +
+            'transition:opacity .12s ease;padding:5px 9px;border-radius:6px;background:#1f2328;' +
+            'color:#fff;font-size:12px;line-height:16px;font-weight:500;white-space:nowrap;' +
+            'letter-spacing:0;box-shadow:0 6px 16px rgba(0,0,0,.22);';
+          const hideBubble = () => {
+            bubble.style.opacity = '0';
+            bubble.style.visibility = 'hidden';
+            bubble.remove();
+          };
+          const showBubble = () => {
+            const rect = addButton.getBoundingClientRect();
+            document.body.appendChild(bubble);
+            bubble.style.visibility = 'visible';
+            bubble.style.left = Math.round(rect.left) + 'px';
+            bubble.style.top = Math.round(rect.bottom + 6) + 'px';
+            bubble.style.opacity = '1';
+            // Flip above when the button sits near the bottom edge.
+            const box = bubble.getBoundingClientRect();
+            if (box.bottom > window.innerHeight - 8) {
+              bubble.style.top = Math.round(rect.top - box.height - 6) + 'px';
+            }
+          };
           // Inline styles cannot express :hover, so the affordance is toggled by
           // hand with the theme's own interactive background token.
           addButton.addEventListener('mouseenter', () => {
             addButton.style.background = 'var(--dsw-alias-interactive-bg-hover)';
             addButton.style.opacity = '1';
+            showBubble();
           });
           addButton.addEventListener('mouseleave', () => {
             addButton.style.background = 'transparent';
             addButton.style.opacity = '.7';
+            hideBubble();
           });
-          addButton.innerHTML =
-            '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">' +
-            '<path d="M6 2.5v7M2.5 6h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>' +
-            '</svg>';
+          // Mirror the shell's own "new workspace" control: clone its glyph and
+          // normalise the box, since the original may be sized by a class.
+          addButton.innerHTML = workspaceGlyphMarkup();
+          const glyph = addButton.querySelector('svg');
+          if (glyph) {
+            glyph.removeAttribute('class');
+            glyph.setAttribute('width', '14');
+            glyph.setAttribute('height', '14');
+            glyph.setAttribute('aria-hidden', 'true');
+          }
           addButton.addEventListener('click', (event) => {
             event.preventDefault();
             event.stopPropagation();
+            hideBubble();
             createWorkspaceInCategory(categoryId);
           });
           holder.appendChild(chevron);
@@ -1725,6 +1820,11 @@ window.__ModuleLoader__.load({
             event.stopPropagation();
             toggle(holder.getAttribute('data-category') || '');
           });
+          // The shell opens a row's hover card from pointer moves it reads at the
+          // list — or at a root above it — so a bubble listener on this band
+          // cannot stop it. The guard below intercepts those moves at the
+          // document's capture phase instead; it is registered once by the
+          // effect, not per band.
           holder.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' && event.key !== ' ') return;
             event.preventDefault();
@@ -1778,6 +1878,28 @@ window.__ModuleLoader__.load({
           if (computeSignature(workspaceRows) === signature) return;
 
           restore();
+
+          // Measure while the rows are laid out: restore() just undid the
+          // collapse hiding, so this is the one moment geometry is readable even
+          // when every category is collapsed. Hidden rows report a zero box, and
+          // copying that would shrink a band until its label disappeared.
+          const laidOut = (element) => element.getBoundingClientRect().width > 0;
+          const sessionRow =
+            [...document.querySelectorAll('[data-row-key^="session:"]')].find(laidOut) || null;
+          const referenceRow = sessionRow || workspaceRows.find(laidOut) || null;
+          if (referenceRow) {
+            const rowRect = referenceRow.getBoundingClientRect();
+            lastRowBox = { left: rowRect.left, width: rowRect.width };
+            const edges = [];
+            for (const element of referenceRow.querySelectorAll('*')) {
+              if (element.childElementCount > 0) continue;
+              const text = element.textContent;
+              if (!text || text.trim() === '') continue;
+              const rect = element.getBoundingClientRect();
+              if (rect.width > 0 && rect.height > 0) edges.push(rect.right);
+            }
+            if (edges.length > 0) lastColumnRight = Math.max(...edges);
+          }
 
           if (!state.showHeaders || state.categories.length === 0) {
             // Header bands are nodes this component mounts; turning the toggle
@@ -1845,8 +1967,9 @@ window.__ModuleLoader__.load({
               mounted.set(categoryId, header);
             }
             updateHeader(header, names.get(categoryId) || '', collapsed[categoryId] === true);
-            if (header.nextElementSibling !== anchor) {
-              anchor.parentElement?.insertBefore(header, anchor);
+            const placement = bandPlacement(anchor);
+            if (placement.list && (header.parentElement !== placement.list || header.nextElementSibling !== placement.before)) {
+              placement.list.insertBefore(header, placement.before);
             }
           }
 
@@ -1862,6 +1985,36 @@ window.__ModuleLoader__.load({
               governed = state.assignments[key.slice('workspace:'.length)] || '';
             }
             if (governed !== '' && banded.has(governed)) indent(row);
+          }
+
+          // A band heads the rows below it, so it may not be wider than they are:
+          // the shell insets each row, and the band copies the inset and width
+          // measured above instead of spanning the whole list (where a scrollbar
+          // would clip it).
+          if (lastRowBox) {
+            for (const header of mounted.values()) {
+              const rect = header.getBoundingClientRect();
+              const currentMargin = Number.parseFloat(header.style.marginLeft) || 0;
+              const naturalLeft = rect.left - currentMargin;
+              header.style.marginLeft = Math.max(0, lastRowBox.left - naturalLeft) + 'px';
+              header.style.width = lastRowBox.width + 'px';
+            }
+          }
+
+          // Park each band's "+" on the column measured above: the session rows'
+          // own right inset belongs to the shell, so it is copied rather than
+          // guessed.
+          const column = lastColumnRight;
+          if (column !== null) {
+            for (const header of mounted.values()) {
+              // The 12px glyph is centred in a 20px hit box, so its right edge
+              // sits 4px inside the box's; that offset is what lands the mark
+              // on the label's column rather than past it.
+              const pad = Math.max(header.getBoundingClientRect().right - column - 4, 8);
+              if (Number.isFinite(pad) && pad >= 0 && pad <= 120) {
+                header.style.paddingRight = Math.round(pad) + 'px';
+              }
+            }
           }
 
           signature = computeSignature(workspaceRows);
@@ -2065,6 +2218,7 @@ window.__ModuleLoader__.load({
           }
         });
         observer.observe(document.body, { childList: true, subtree: true });
+
         window.addEventListener('dsh-session-hygiene:categories', refresh);
         refresh();
 
