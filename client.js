@@ -1874,8 +1874,14 @@ window.__ModuleLoader__.load({
 
         const paint = () => {
           if (disposed || dragging) return;
-          const workspaceRows = Array.from(document.querySelectorAll('[data-row-key^="workspace:"]'));
-          if (computeSignature(workspaceRows) === signature) return;
+          // Every row counts, not just the workspaces: a group that grows past
+          // the shell's watermark mounts an `overflow:` row, and a session that
+          // arrives while its category is collapsed mounts a session row that
+          // must be hidden on the spot. Keying the signature on workspace rows
+          // alone made both of those mount changes invisible to this repaint.
+          const rows = Array.from(document.querySelectorAll('[data-row-key]'));
+          if (computeSignature(rows) === signature) return;
+          const workspaceRows = rows.filter((row) => (row.getAttribute('data-row-key') || '').startsWith('workspace:'));
 
           restore();
 
@@ -1906,15 +1912,19 @@ window.__ModuleLoader__.load({
             // off has to take them down. Leaving them would also strand them:
             // with no repaint the click still posts a toggle but nothing moves.
             clear();
-            signature = computeSignature(workspaceRows);
+            signature = computeSignature(rows);
             return;
           }
 
           const names = new Map(state.categories.map((category) => [category.id, category.name]));
           const collapsed = state.collapsed || {};
 
-          // A collapsed category hides its workspace rows and the session rows
-          // that follow each of them, up to the next workspace row.
+          // A collapsed category hides its workspace rows, the session rows
+          // that follow each of them, and the "show N more sessions" row that
+          // ends a long group, up to the next workspace row. That overflow row
+          // is a row of the SHELL's list too (`overflow:<group>`), so it has to
+          // be named here: leaving it behind strands a lone button under the
+          // band, which reads as a broken group rather than a collapsed one.
           let owning = '';
           for (const row of document.querySelectorAll('[data-row-key]')) {
             const key = row.getAttribute('data-row-key') || '';
@@ -1923,6 +1933,11 @@ window.__ModuleLoader__.load({
               if (owning && collapsed[owning]) conceal(row);
             } else if (key.startsWith('session:')) {
               if (owning && collapsed[owning]) conceal(row);
+            } else if (key.startsWith('overflow:')) {
+              // The row carries its own workspace, so read it from the key
+              // instead of trusting the running `owning`.
+              const owner = state.assignments[key.slice('overflow:'.length)] || '';
+              if (owner && collapsed[owner]) conceal(row);
             }
           }
 
@@ -2017,7 +2032,7 @@ window.__ModuleLoader__.load({
             }
           }
 
-          signature = computeSignature(workspaceRows);
+          signature = computeSignature(rows);
         };
 
         const schedule = () => {

@@ -106,6 +106,8 @@ Open **Settings → Workspace categories**.
 - **+ on a band** opens the host's directory dialog and registers the chosen
   folder as a workspace, filed under that category and regrouped into place.
 - Click a header to collapse or expand a category; the collapsed state persists.
+  Collapsing also hides the **show N more sessions** row of every long group
+  underneath, so a collapsed category leaves only its band on screen.
   **Show category headers in the sidebar** hides the bands without losing the
   assignments.
 
