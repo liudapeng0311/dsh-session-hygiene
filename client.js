@@ -2209,6 +2209,48 @@ window.__ModuleLoader__.load({
             : false;
         };
 
+        /**
+         * Dress rows the moment they mount.
+         *
+         * The debounced paint lands ~80ms after a row appears — long enough for
+         * the browser to paint the freshly opened group's rows flush with their
+         * band, so a running session's status dot visibly jumps to the band's
+         * edge and only then slides right. MutationObserver callbacks run before
+         * the next paint, so writing the same display/padding here closes that
+         * window; the scheduled paint still owns the measuring and the bands.
+         */
+        const dress = (nodes) => {
+          if (!state.showHeaders || state.categories.length === 0) return;
+          const fresh = new Set();
+          for (const node of nodes) {
+            if (!node || node.nodeType !== 1) continue;
+            if (node.hasAttribute('data-row-key')) fresh.add(node);
+            else if (typeof node.querySelector === 'function') {
+              for (const row of node.querySelectorAll('[data-row-key]')) fresh.add(row);
+            }
+          }
+          if (fresh.size === 0) return;
+
+          const collapsed = state.collapsed || {};
+          // One document-order pass, exactly like paint(): a session row belongs
+          // to the workspace row above it, while an overflow row names its own.
+          let owning = '';
+          for (const row of document.querySelectorAll('[data-row-key]')) {
+            const key = row.getAttribute('data-row-key') || '';
+            if (key.startsWith('workspace:')) {
+              owning = state.assignments[key.slice('workspace:'.length)] || '';
+            }
+            if (!fresh.has(row)) continue;
+            const category = key.startsWith('overflow:')
+              ? state.assignments[key.slice('overflow:'.length)] || ''
+              : owning;
+            if (!category) continue;
+            if (collapsed[category]) conceal(row);
+            // Only a category that actually drew a band indents its rows.
+            else if (mounted.has(category)) indent(row);
+          }
+        };
+
         const refresh = async () => {
           try {
             const result = await post({ action: 'categories' });
@@ -2227,10 +2269,21 @@ window.__ModuleLoader__.load({
 
         const observer = new MutationObserver((records) => {
           if (dragging) return;
+          let changed = false;
+          const fresh = [];
           for (const record of records) {
-            for (const node of record.addedNodes) if (relevant(node)) return schedule();
-            for (const node of record.removedNodes) if (relevant(node)) return schedule();
+            for (const node of record.addedNodes) {
+              if (!relevant(node)) continue;
+              changed = true;
+              fresh.push(node);
+            }
+            for (const node of record.removedNodes) if (relevant(node)) changed = true;
           }
+          if (!changed) return;
+          // New rows must be dressed before this frame paints; the debounced
+          // paint that follows rebuilds bands and re-measures the list.
+          dress(fresh);
+          schedule();
         });
         observer.observe(document.body, { childList: true, subtree: true });
 
