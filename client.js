@@ -1570,6 +1570,9 @@ window.__ModuleLoader__.load({
 
     const LABEL_ATTR = 'data-session-hygiene-label';
     const LABEL_TEXT_ATTR = 'data-session-hygiene-label-text';
+    // A band's "+" is a 14px glyph centred in a 20px hit box, so 3px of the box
+    // sits past the glyph on each side.
+    const ADD_GLYPH_INSET_PX = 3;
 
     /**
      * `sidebar.workspaces` is a single slot owned by the shell, so a category
@@ -1583,11 +1586,18 @@ window.__ModuleLoader__.load({
     function SidebarGroupLabels() {
       React.useEffect(() => {
         let state = { categories: [], assignments: {}, collapsed: {}, showHeaders: true };
-        // Last laid-out row geometry and time-label column. Rows report a zero
-        // box while hidden — every row hides once all categories collapse — so
-        // the last good measurement is reused instead of shrinking to nothing.
+        // Last laid-out row geometry and the row's own inline-end inset. Rows
+        // report a zero box while hidden — every row hides once all categories
+        // collapse — so the last good measurement is reused instead of shrinking
+        // to nothing.
         let lastRowBox = null;
-        let lastColumnRight = null;
+        // Where a row's content stops, counted from the row's outer edge: its
+        // paint border plus its padding. This is read from the row's own style,
+        // never from the text inside it — a hovered row swaps its trailing cell
+        // for its action buttons and a truncated title ends wherever the text
+        // does, so a column measured off text made the band's "+" slide left
+        // while the pointer was on a row and right once it left.
+        let lastRightInset = null;
         let signature = '';
         let timer = 0;
         let disposed = false;
@@ -1709,23 +1719,37 @@ window.__ModuleLoader__.load({
         };
 
         /**
-         * Where a band must live: the anchor's own wrapper chain is not a list.
-         * A workspace row sits inside a single-child wrapper (and that inside a
-         * group section), so inserting beside the row puts the band INSIDE the
-         * workspace's hover subtree — entering the band opens that workspace's
-         * hover card. Climb past every wrapper that holds only one child, and
-         * insert into the first container that actually holds siblings.
+         * Where a band must live: inside the group section that holds the row it
+         * labels, as that section's first child — above the row's own wrapper, so
+         * the band stays OUTSIDE the workspace's hover subtree, yet still shares
+         * the section's spacing.
+         *
+         * This used to climb "past every wrapper that holds only one child" and
+         * insert into the first container with siblings. A section holds exactly
+         * one child while its workspace is collapsed and several as soon as its
+         * sessions mount, so expanding the first workspace of a category moved
+         * the band from the list into the section — which cost the section its own
+         * top margin and gave the row the section's sibling gap — and the band,
+         * with every row under it, jumped down and back on every toggle. The
+         * shell's tree marks the list (`role="tree"`), so the section is found by
+         * shape instead of by counting children, which no expand can change.
          */
         const bandPlacement = (anchor) => {
-          let node = anchor;
-          let parent = node.parentElement;
-          while (parent && parent !== document.body) {
-            const owned = [...parent.children].filter((child) => !child.hasAttribute(LABEL_ATTR));
-            if (owned.length > 1) break;
-            node = parent;
-            parent = parent.parentElement;
+          const tree = anchor.closest('[role="tree"]');
+          let section = anchor;
+          while (tree && section.parentElement && section.parentElement !== tree) {
+            section = section.parentElement;
           }
-          return { list: parent ?? anchor.parentElement, before: node };
+          // An unexpected list shape: sit beside the section rather than guess
+          // deeper or insert into the row's own wrapper.
+          if (!tree || section === anchor) {
+            return { list: section.parentElement ?? anchor.parentElement, before: section };
+          }
+          // Skip our own labels: once one is mounted it is the section's first
+          // child, and re-inserting a band in front of itself would mutate the
+          // list on every paint.
+          const first = [...section.children].find((child) => !child.hasAttribute(LABEL_ATTR));
+          return { list: section, before: first ?? anchor };
         };
 
         /** Builds one header node; listeners are bound once, not on every paint. */
@@ -1739,7 +1763,7 @@ window.__ModuleLoader__.load({
           holder.setAttribute('data-category', categoryId);
           holder.style.cssText =
             'display:flex;align-items:center;gap:5px;box-sizing:border-box;' +
-            'padding:10px 18px 3px 10px;border:0;background:transparent;cursor:pointer;' +
+            'padding:10px 8px 3px 10px;border:0;background:transparent;cursor:pointer;' +
             'text-align:left;font-size:12px;line-height:18px;font-weight:600;' +
             'letter-spacing:.01em;color:var(--dsw-alias-label-tertiary);user-select:none;';
           const chevron = document.createElement('span');
@@ -1890,21 +1914,19 @@ window.__ModuleLoader__.load({
           // when every category is collapsed. Hidden rows report a zero box, and
           // copying that would shrink a band until its label disappeared.
           const laidOut = (element) => element.getBoundingClientRect().width > 0;
+          // A band heads workspace rows, so a workspace row owns the measurement:
+          // it always sits next to the band it belongs to, while the first session
+          // row on screen can belong to any workspace at all.
           const sessionRow =
             [...document.querySelectorAll('[data-row-key^="session:"]')].find(laidOut) || null;
-          const referenceRow = sessionRow || workspaceRows.find(laidOut) || null;
+          const referenceRow = workspaceRows.find(laidOut) || sessionRow;
           if (referenceRow) {
             const rowRect = referenceRow.getBoundingClientRect();
             lastRowBox = { left: rowRect.left, width: rowRect.width };
-            const edges = [];
-            for (const element of referenceRow.querySelectorAll('*')) {
-              if (element.childElementCount > 0) continue;
-              const text = element.textContent;
-              if (!text || text.trim() === '') continue;
-              const rect = element.getBoundingClientRect();
-              if (rect.width > 0 && rect.height > 0) edges.push(rect.right);
-            }
-            if (edges.length > 0) lastColumnRight = Math.max(...edges);
+            const rowStyle = window.getComputedStyle(referenceRow);
+            const paintBorder = Number.parseFloat(rowStyle.borderRightWidth) || 0;
+            const rowPadding = Number.parseFloat(rowStyle.paddingRight) || 0;
+            if (paintBorder + rowPadding > 0) lastRightInset = paintBorder + rowPadding;
           }
 
           if (!state.showHeaders || state.categories.length === 0) {
@@ -2016,17 +2038,19 @@ window.__ModuleLoader__.load({
             }
           }
 
-          // Park each band's "+" on the column measured above: the session rows'
-          // own right inset belongs to the shell, so it is copied rather than
-          // guessed.
-          const column = lastColumnRight;
-          if (column !== null) {
+          // Park each band's "+" on the row's inline-end inset measured above.
+          // The column is a row's outer edge less that inset — the same for every
+          // row, whatever it is showing — so the mark cannot drift; reading the
+          // band's own rect still corrects for a box its container nudged.
+          if (lastRightInset !== null && lastRowBox) {
+            const column = lastRowBox.left + lastRowBox.width - lastRightInset;
+            // The 14px glyph is centred in a 20px hit box, so its right edge
+            // sits 3px inside the box's; that offset is what lands the mark on
+            // the label's column rather than past it.
             for (const header of mounted.values()) {
-              // The 12px glyph is centred in a 20px hit box, so its right edge
-              // sits 4px inside the box's; that offset is what lands the mark
-              // on the label's column rather than past it.
-              const pad = Math.max(header.getBoundingClientRect().right - column - 4, 8);
-              if (Number.isFinite(pad) && pad >= 0 && pad <= 120) {
+              const right = header.getBoundingClientRect().right;
+              const pad = Math.max(right - column - ADD_GLYPH_INSET_PX, 8);
+              if (Number.isFinite(pad) && pad <= 120) {
                 header.style.paddingRight = Math.round(pad) + 'px';
               }
             }
