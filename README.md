@@ -17,6 +17,25 @@ Three gaps in the shipped DSH sidebar, closed by one plugin:
 Everything is additive: no shipped row is replaced or hidden, and no DOM outside
 these components is rewritten.
 
+## Screenshots
+
+**Categories in the sidebar.** A category band heads its own workspaces: their
+rows sit indented beneath the band that names them, and the **+** on the band
+registers a new workspace straight into that category. Clicking the band
+collapses the whole group.
+
+![Workspaces grouped under category bands in the sidebar](https://raw.githubusercontent.com/liudapeng0311/dsh-session-hygiene/main/docs/images/sidebar-categories.png)
+
+**Settings → Workspace categories.** Create categories, order them, assign each
+workspace from its dropdown, and turn the sidebar bands on or off.
+
+![Workspace categories settings page](https://raw.githubusercontent.com/liudapeng0311/dsh-session-hygiene/main/docs/images/workspace-categories.png)
+
+**Settings → Session cleanup.** Sessions left behind by deleted workspaces, plus
+the trash, with archive, trash, restore and purge.
+
+![Session cleanup settings page](https://raw.githubusercontent.com/liudapeng0311/dsh-session-hygiene/main/docs/images/session-cleanup.png)
+
 ## Where it shows up
 
 | Surface | What you get |

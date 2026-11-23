@@ -14,6 +14,24 @@
 
 全部是增量改动：不替换、不隐藏任何自带行，也不重写这些组件以外的 DOM。
 
+## 截图
+
+**侧栏里的分类标题。** 一个分类标题下面就是属于它的工作区：这些行整体向内
+缩进一级，读起来是这一组的成员而不是同级；标题右侧的 **+** 把新工作区直接
+注册进这个分类，点标题可以整组折叠。
+
+![侧栏里按分类分组的工作区](https://raw.githubusercontent.com/liudapeng0311/dsh-session-hygiene/main/docs/images/sidebar-categories.png)
+
+**设置 → 工作区分类。** 新建分类、排序、用下拉框给每个工作区选分类，以及
+开关侧栏的分类标题。
+
+![工作区分类设置页](https://raw.githubusercontent.com/liudapeng0311/dsh-session-hygiene/main/docs/images/workspace-categories.png)
+
+**设置 → 会话清理。** 被删工作区遗留下来的会话，以及回收站；归档、移入
+回收站、还原、彻底删除都在这里。
+
+![会话清理设置页](https://raw.githubusercontent.com/liudapeng0311/dsh-session-hygiene/main/docs/images/session-cleanup.png)
+
 ## 它出现在哪
 
 | 位置 | 你会看到什么 |
